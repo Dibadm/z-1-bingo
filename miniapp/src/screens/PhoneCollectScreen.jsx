@@ -34,7 +34,7 @@ export default function PhoneCollectScreen({ onDone }) {
       <div className="screen screen-center">
         <div className="text-center mb-1">
           <div className="brand-mark">ሀበሻ ቤት</div>
-          <div className="text-sm text-dim mt-1">Habesha Bet</div>
+          <div className="text-sm text-dim mt-1">Z 1 BINGO</div>
         </div>
 
         <div className="card">

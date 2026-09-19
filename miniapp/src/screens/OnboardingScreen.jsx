@@ -52,9 +52,9 @@ export default function OnboardingScreen({ onDone }) {
   return (
     <FadeIn>
       <div className="screen screen-center">
-        <div className="text-center mb-1">
-          <div className="brand-mark">ሀበሻ ቤት</div>
-          <div className="text-sm text-dim mt-1">Habesha Bet</div>
+<div className="text-center mb-1">
+          <div className="brand-mark">Z 1 BINGO</div>
+          <div className="text-sm text-dim mt-1">Z 1 BINGO</div>
         </div>
 
         <div className="card" style={{ padding: 24, textAlign: 'center' }}>

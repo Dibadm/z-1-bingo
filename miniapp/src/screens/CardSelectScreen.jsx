@@ -82,6 +82,15 @@ export default function CardSelectScreen({ roomFee, onBack, onGameStart }) {
     haptic.medium();
   };
 
+  const toggle = (idx) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   const confirmPurchase = useCallback(async (indices) => {
     const toBuy = indices ?? [...selected];
     if (toBuy.length === 0) return;

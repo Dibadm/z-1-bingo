@@ -61,7 +61,7 @@ def _user_id_from_init_data(init_data: str) -> str | None:
         pass
     return None
 
-app = FastAPI(title="Habesha Bet Mini App API")
+app = FastAPI(title="Z 1 BINGO Mini App API")
 
 app.add_middleware(
     CORSMiddleware,

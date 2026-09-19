@@ -14,7 +14,7 @@ STRINGS = {
     # ──────────────────────────────────────────
     "welcome_new": {
         "en": (
-            "👋 Welcome to <b>Habesha Bet</b>!\n\n"
+            "👋 Welcome to <b>Z 1 BINGO</b>!\n\n"
             "To get started, please share your phone number so we can\n"
             "process withdrawals to your Telebirr account.\n\n"
             "Tap the button below 👇"
@@ -31,7 +31,7 @@ STRINGS = {
         "am": "📱 ስልክ ቁጥር አጋራ",
     },
     "phone_saved": {
-        "en": "✅ Phone number saved! Welcome to Habesha Bet 🎉",
+        "en": "✅ Phone number saved! Welcome to Z 1 BINGO 🎉",
         "am": "✅ ስልክ ቁጥር ተቀምጧል! ወደ ሀበሻ ቤት እንኳን ደህና መጡ 🎉",
     },
     "signup_bonus_received": {
@@ -56,7 +56,7 @@ STRINGS = {
             "ከታች ይምረጡ:"
         ),
     },
-    "btn_open_app":      {"en": "🎮 Open Habesha Bet",  "am": "🎮 ሀበሻ ቤት ክፈት"},
+    "btn_open_app":      {"en": "🎮 Open Z 1 BINGO",  "am": "🎮 ሀበሻ ቤት ክፈት"},
     "btn_play_games":    {"en": "🎮 Play Games",      "am": "🎮 ጨዋታ ተጫዋቱ"},
     "btn_deposit":       {"en": "💳 Deposit",          "am": "💳 ገንዘብ ያስገቡ"},
     "btn_withdraw":      {"en": "💸 Withdraw",         "am": "💸 ገንዘብ ያውጡ"},

@@ -426,7 +426,7 @@ async def run_game_lifecycle(bot, room_fee, game_id):
             )
 
         await group_broadcast(bot, game_id, f"🚀 Game starting! Room {room_fee} ETB — {sold} cards sold.")
-        await notify_game_players(bot, game_id, f"🎱 Your Habesha Bet game ({room_fee} ETB room) is starting now — open the app to play!")
+        await notify_game_players(bot, game_id, f"🎱 Your Z 1 BINGO game ({room_fee} ETB room) is starting now — open the app to play!")
 
         call_sequence = bingo.generate_call_sequence()
         called_numbers = []
