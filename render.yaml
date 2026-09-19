@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: habesha-api
+    repo: Dibadm/z-1-bingo
+    root: backend
+    pythonVersion: "3.11"
+    buildCommand: cd backend && pip install -r requirements.txt && cd ../miniapp && npm install && npm run build
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PRODUCTION
+        value: "true"
+      - key: ALLOW_DEV_AUTH
+        value: "false"
+  - type: worker
+    name: habesha-bot
+    repo: Dibadm/z-1-bingo
+    root: backend
+    pythonVersion: "3.11"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PRODUCTION
+        value: "true"
+      - key: ALLOW_DEV_AUTH
+        value: "false"
