@@ -1082,7 +1082,12 @@ def get_or_create_active_game(room_fee: float):
             (room_fee, datetime.utcnow().isoformat())
         )
         conn.commit()
-        cur.execute("SELECT * FROM games WHERE id = %s", (cur.lastrowid,))
+        # NOTE: cur.lastrowid is unreliable with psycopg2 (it's None for
+        # plain INSERTs), so re-query by room_fee rather than trusting it.
+        cur.execute(
+            "SELECT * FROM games WHERE room_fee = %s AND state = 'waiting' ORDER BY id DESC LIMIT 1",
+            (room_fee,)
+        )
         game = cur.fetchone()
     release_connection(conn)
     return game
