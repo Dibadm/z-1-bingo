@@ -11,9 +11,10 @@ import Icon from '../components/Icon';
 const LETTERS = ['B', 'I', 'N', 'G', 'O'];
 
 export default function LiveGameScreen({ gameId, onFinished }) {
-  const { runAction, refreshUser } = useStore();
+  const { runAction, refreshUser, showToast } = useStore();
   const [state, setState] = useState(null);
   const [audioOn, setAudioOn] = useState(true);
+  const [claiming, setClaiming] = useState(false);
   const lastSpokenRef = useRef(null);
   const currentAudioRef = useRef(null);
   const gameStartAnnouncedForRef = useRef(null);
@@ -98,8 +99,16 @@ export default function LiveGameScreen({ gameId, onFinished }) {
   }, [gameId, refreshUser, playAnnouncement, playGameStart]);
 
   const baseInterval = state === 'running' ? 3000 : 5000;
+  // During the final stretch of the lobby countdown the game flips from
+  // "waiting" to "running" on the server, but the frontend only polls every
+  // baseInterval ms — so a player could sit on a stale "waiting" screen for
+  // several seconds after the game actually started. Poll faster once the
+  // countdown is inside its last 5 seconds so the transition is instant.
+  const nearCountdownEnd =
+    effectiveState && effectiveState.state === 'waiting' &&
+    (effectiveState.countdown_seconds_remaining ?? 99) <= 5;
   const { data, error, loading, resetBackoff } = usePolling(fetchGameState, {
-    interval: baseInterval,
+    interval: nearCountdownEnd ? 1000 : baseInterval,
     backoffMax: 30000,
     immediate: true,
   });
@@ -120,11 +129,18 @@ export default function LiveGameScreen({ gameId, onFinished }) {
   };
 
   const claimBingo = async () => {
+    if (claiming) return;
+    setClaiming(true);
     haptic.medium();
     try {
-      await runAction(() => api.claimBingo(gameId));
+      const res = await runAction(() => api.claimBingo(gameId));
+      // The lifecycle loop resolves the claim server-side; the next poll
+      // will show the finished screen. Show immediate confirmation.
+      showToast(res?.message || 'Claim received! Confirming…', 'success');
     } catch {
-      // already toasted
+      // runAction already toasted the failure
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -168,10 +184,19 @@ export default function LiveGameScreen({ gameId, onFinished }) {
       mainButton.hide();
       return;
     }
+    // In MANUAL mode the player claims via the per-card "BINGO!" button
+    // (CardView), so the Telegram bottom main button would only duplicate
+    // the action and clutter the bottom of the screen. Hide it in manual
+    // mode and keep it only for auto-win players who have no per-card
+    // button to tap.
+    if (effectiveState.manual_mode) {
+      mainButton.hide();
+      return;
+    }
     mainButton.show('🎯 BINGO!', claimBingo);
     return () => mainButton.offClick(claimBingo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveState?.state]);
+  }, [effectiveState?.state, effectiveState?.manual_mode]);
 
   if (!effectiveState) {
     return (
@@ -189,11 +214,15 @@ export default function LiveGameScreen({ gameId, onFinished }) {
   if (effectiveState.state === 'waiting') {
     const remaining = effectiveState.countdown_seconds_remaining ?? null;
     const total = effectiveState.countdown_total_seconds || 60;
+    // Once the countdown hits 0 the server flips the game to "running", but
+    // there can be a poll-cycle delay. Show "Starting…" instead of the stale
+    // "Waiting for players" so the player doesn't think the round stalled.
+    const startingSoon = remaining === 0 || remaining === null;
     return (
       <FadeIn>
         <div className="screen">
           <div className="card waiting-card">
-            <div className="text-xl text-bold mb-1">⏳ Waiting for players…</div>
+            <div className="text-xl text-bold mb-1">{startingSoon ? '🎲 Starting…' : '⏳ Waiting for players…'}</div>
             {remaining !== null && remaining > 0 && (
               <>
                 <div className="row mt-2 mb-1">
