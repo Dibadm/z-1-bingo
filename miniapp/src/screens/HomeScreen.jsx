@@ -43,7 +43,7 @@ export default function HomeScreen({ onEnterRoom, onOpenGame }) {
   return (
     <FadeIn>
       <div className="screen">
-        <TopBar title="ሀበሻ ቤት" />
+        <TopBar title="Z ONE BINGO" />
 
         {error && (
           <div className="text-sm text-red row" style={{ padding: '8px 12px', background: '#2a0a0a', borderRadius: 8, marginBottom: 8, gap: 6, justifyContent: 'flex-start' }}>
