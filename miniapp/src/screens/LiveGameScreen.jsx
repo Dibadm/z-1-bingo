@@ -104,9 +104,12 @@ export default function LiveGameScreen({ gameId, onFinished }) {
   // baseInterval ms — so a player could sit on a stale "waiting" screen for
   // several seconds after the game actually started. Poll faster once the
   // countdown is inside its last 5 seconds so the transition is instant.
+  // Computed from `state` (the raw poll result) rather than effectiveState
+  // because effectiveState is derived below — referencing it here would hit
+  // a temporal-dead-zone error.
   const nearCountdownEnd =
-    effectiveState && effectiveState.state === 'waiting' &&
-    (effectiveState.countdown_seconds_remaining ?? 99) <= 5;
+    state && state.state === 'waiting' &&
+    (state.countdown_seconds_remaining ?? 99) <= 5;
   const { data, error, loading, resetBackoff } = usePolling(fetchGameState, {
     interval: nearCountdownEnd ? 1000 : baseInterval,
     backoffMax: 30000,
