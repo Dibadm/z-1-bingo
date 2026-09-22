@@ -1411,7 +1411,11 @@ def main():
         application.post_init = post_init
 
     import signal
-    loop = asyncio.get_event_loop()
+    # Python 3.14 removed the implicit loop creation of get_event_loop()
+    # when called outside a running loop, so create one explicitly. This
+    # works on 3.11+ and is what the production bot worker needs.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     stop_event = asyncio.Event()
 
     def _signal_handler():
