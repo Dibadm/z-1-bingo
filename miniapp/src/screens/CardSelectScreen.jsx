@@ -30,8 +30,17 @@ export default function CardSelectScreen({ roomFee, onBack, onGameStart }) {
     return res;
   }, [roomFee, onGameStart]);
 
+  // Poll faster once the countdown is inside its last 5 seconds. The game
+  // flips from "waiting" to "running" on the server, but with a fixed
+  // 5s poll interval a player could sit on a stale lobby screen for up to
+  // 5 seconds after the round actually started. Computed from `data` (the
+  // raw poll result) rather than the derived effectiveData below, because
+  // referencing effectiveData here would hit a temporal-dead-zone error.
+  const nearCountdownEnd =
+    data && data.state === 'waiting' &&
+    (data.countdown_seconds_remaining ?? 99) <= 5;
   const { data: pollData, error: pollError, loading } = usePolling(load, {
-    interval: 5000,
+    interval: nearCountdownEnd ? 1000 : 5000,
     backoffMax: 30000,
   });
 
