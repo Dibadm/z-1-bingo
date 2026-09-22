@@ -592,6 +592,11 @@ def handle_claim_bingo(user_id: int, game_id: int) -> dict:
     if not winners:
         return {"ok": False, "error": "no_valid_win", "message": "No valid win on your cards yet."}
 
+    # Record the claim row FIRST. try_finish_manual_claim then marks it
+    # resolved=1 atomically; if two players claim at the same moment only
+    # one UPDATE affects a row, so the round is paid out exactly once.
+    db.record_manual_bingo_claim(game_id, user_id, card_indices)
+
     winners_found = {}
     claimed = db.try_finish_manual_claim(
         game_id, user_id, marked_by_card, called_set, winners_found
