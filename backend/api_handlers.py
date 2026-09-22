@@ -552,22 +552,43 @@ def handle_mark_number(user_id: int, game_id: int, card_index: int, number: int)
 
 
 def handle_claim_bingo(user_id: int, game_id: int) -> dict:
-    """Manual BINGO claim from the Mini App. Validates structural wins 
-    and persists the claim to the DB so the lifecycle loop can resolve it,
-    even if the API server and bot run in separate processes."""
+    """Manual BINGO claim from the Mini App.
+
+    In MANUAL mode the player marks numbers themselves by tapping each
+    called ball. A win is a line/corners formed by the player's MARKED
+    numbers — NOT by the raw server-called numbers. (Evaluating against
+    called_numbers alone would only ever award auto-win style wins and
+    would reject every legitimate manual claim, since the called numbers
+    rarely form a complete line on their own.)
+
+    Every marked number is additionally verified to be a real called ball,
+    so a player cannot win by marking uncalled numbers.
+    """
     game = db.get_game(game_id)
     if game is None or game["state"] != "running":
         return {"ok": False, "error": "game_not_running", "message": "This game is not currently running."}
 
     called_numbers = db.get_called_numbers(game_id)
+    called_set = set(called_numbers)
     card_indices = db.get_player_cards(game_id, user_id)
-    detected = bingo.evaluate_player_cards_detailed(card_indices, called_numbers)
 
-    if not detected:
+    # Evaluate the player's manual marks (not the raw called list).
+    marked_by_card = db.get_all_marked_numbers(game_id)
+    winners = {}
+    for idx in card_indices:
+        marked = set(marked_by_card.get(idx, []))
+        # A claim is only valid if every marked number was actually called.
+        if not marked or not marked.issubset(called_set):
+            continue
+        win_type = bingo.get_win_type(bingo.get_card(idx), marked)
+        if win_type != "none":
+            winners[idx] = win_type
+
+    if not winners:
         return {"ok": False, "error": "no_valid_win", "message": "No valid win on your cards yet."}
 
     db.record_manual_bingo_claim(game_id, user_id, card_indices)
-    return {"ok": True, "message": "Claim received! Confirming…"}
+    return {"ok": True, "winners": {str(k): v for k, v in winners.items()}, "message": "Claim received! Confirming…"}
 
 # =====================================================================
 # DEPOSIT / WITHDRAW / TRANSFER
