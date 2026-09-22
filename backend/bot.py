@@ -426,7 +426,7 @@ async def run_game_lifecycle(bot, room_fee, game_id):
             )
 
         await group_broadcast(bot, game_id, f"🚀 Game starting! Room {room_fee} ETB — {sold} cards sold.")
-        await notify_game_players(bot, game_id, f"🎱 Your Z 1 BINGO game ({room_fee} ETB room) is starting now — open the app to play!")
+        await notify_game_players(bot, game_id, f"🎱 Your Habesha Bet game ({room_fee} ETB room) is starting now — open the app to play!")
 
         call_sequence = bingo.generate_call_sequence()
         called_numbers = []
@@ -448,21 +448,11 @@ async def run_game_lifecycle(bot, room_fee, game_id):
             manual_claims = db.get_manual_bingo_claims(game_id)
             for claim_uid, claimed_cards in manual_claims.items():
                 safe_cards = [_safe_card_index(c) for c in claimed_cards]
-                # Manual wins are judged by the player's MARKED numbers,
-                # not the raw called list — see handle_claim_bingo in
-                # api_handlers.py for the rationale.
-                marked_by_card = db.get_all_marked_numbers(game_id)
-                called_set = set(called_numbers)
-                manual_winners = {}
-                for idx in safe_cards:
-                    marked = set(marked_by_card.get(idx, []))
-                    if not marked or not marked.issubset(called_set):
-                        continue
-                    win_type = bingo.get_win_type(bingo.get_card(idx), marked)
-                    if win_type != "none":
-                        manual_winners[idx] = win_type
-                if manual_winners:
-                    winners_found[claim_uid] = manual_winners
+                revalidated = bingo.evaluate_player_cards_detailed(
+                    safe_cards, called_numbers
+                )
+                if revalidated:
+                    winners_found[claim_uid] = revalidated
 
             if winners_found:
                 logger.info(f"[lifecycle] WIN DETECTED game {game_id} winners={list(winners_found.keys())} types={list(winners_found.values())}")
@@ -482,21 +472,14 @@ async def run_game_lifecycle(bot, room_fee, game_id):
         if not winners_found:
             manual_claims = db.get_manual_bingo_claims(game_id)
             logger.info(f"[lifecycle] post-loop manual claims for game {game_id}: {manual_claims}")
-            marked_by_card = db.get_all_marked_numbers(game_id)
-            called_set = set(called_numbers)
             for claim_uid, claimed_cards in manual_claims.items():
                 safe_cards = [_safe_card_index(c) for c in claimed_cards]
-                manual_winners = {}
-                for idx in safe_cards:
-                    marked = set(marked_by_card.get(idx, []))
-                    if not marked or not marked.issubset(called_set):
-                        continue
-                    win_type = bingo.get_win_type(bingo.get_card(idx), marked)
-                    if win_type != "none":
-                        manual_winners[idx] = win_type
-                logger.info(f"[lifecycle] post-loop revalidate uid={claim_uid} cards={safe_cards} result={manual_winners}")
-                if manual_winners:
-                    winners_found.setdefault(claim_uid, {}).update(manual_winners)
+                revalidated = bingo.evaluate_player_cards_detailed(
+                    safe_cards, called_numbers
+                )
+                logger.info(f"[lifecycle] post-loop revalidate uid={claim_uid} cards={safe_cards} result={revalidated}")
+                if revalidated:
+                    winners_found.setdefault(claim_uid, {}).update(revalidated)
 
         if winners_found:
             await resolve_round_winners(bot, game_id, room_fee, winners_found)
@@ -1428,11 +1411,7 @@ def main():
         application.post_init = post_init
 
     import signal
-    # Python 3.14 removed the implicit loop creation of get_event_loop()
-    # when called outside a running loop, so create one explicitly. This
-    # works on 3.11+.
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = asyncio.get_event_loop()
     stop_event = asyncio.Event()
 
     def _signal_handler():
