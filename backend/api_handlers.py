@@ -561,8 +561,13 @@ def handle_claim_bingo(user_id: int, game_id: int) -> dict:
     would reject every legitimate manual claim, since the called numbers
     rarely form a complete line on their own.)
 
-    Every marked number is additionally verified to be a real called ball,
-    so a player cannot win by marking uncalled numbers.
+    The round is finished HERE, in the API process, so the win is
+    INSTANT — no waiting for the bot's next 4-second call cycle. This is
+    essential in production where the bot and API run as separate
+    processes: the bot can't see the claim until it polls the DB, which
+    only happens on each call tick. The row lock on
+    manual_bingo_claims (game_id, resolved) keeps two simultaneous claims
+    from double-paying.
     """
     game = db.get_game(game_id)
     if game is None or game["state"] != "running":
@@ -587,8 +592,18 @@ def handle_claim_bingo(user_id: int, game_id: int) -> dict:
     if not winners:
         return {"ok": False, "error": "no_valid_win", "message": "No valid win on your cards yet."}
 
-    db.record_manual_bingo_claim(game_id, user_id, card_indices)
-    return {"ok": True, "winners": {str(k): v for k, v in winners.items()}, "message": "Claim received! Confirming…"}
+    winners_found = {}
+    claimed = db.try_finish_manual_claim(
+        game_id, user_id, marked_by_card, called_set, winners_found
+    )
+    if not claimed:
+        # Someone else claimed it first (or the game ended). Still tell the
+        # frontend the truth — it'll poll and see the finished screen.
+        return {"ok": True, "already_claimed": True,
+                "message": "Round already finished — someone else won!"}
+
+    return {"ok": True, "winners": {str(k): v for k, v in winners_found.get(user_id, winners).items()},
+            "message": "🎉 You won! Prize credited."}
 
 # =====================================================================
 # DEPOSIT / WITHDRAW / TRANSFER

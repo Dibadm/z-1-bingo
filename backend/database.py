@@ -1652,6 +1652,99 @@ def get_recent_winners(limit: int = 8) -> list:
     return out
 
 
+def try_finish_manual_claim(
+    game_id: int,
+    user_id: int,
+    marked_by_card: dict,
+    called_set: set,
+    winners_found: dict,
+) -> bool:
+    """Atomically claim a manual BINGO and finish the round — if nobody
+    else has already claimed it for this game.
+
+    This is the production split fix: the API server (separate process
+    from the bot) can resolve a manual claim the instant it's submitted,
+    instead of waiting for the bot's next 4-second call cycle. The row
+    lock on manual_bingo_claims (game_id, resolved) makes it safe when two
+    players claim at the same moment — only one UPDATE affects a row.
+
+    winners_found is filled in-place with {user_id: {card_index: win_type}}
+    for the caller to credit and announce. Returns True if this call
+    claimed the round, False if someone else already did.
+    """
+    import json
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=extras.RealDictCursor)
+    try:
+        cur.execute("BEGIN")
+
+        # Claim the row (unresolved only). rowcount == 0 means someone else
+        # already resolved this game's claims — bail out, don't double-pay.
+        cur.execute(
+            """UPDATE manual_bingo_claims
+               SET resolved = 1
+               WHERE game_id = %s AND user_id = %s AND resolved = 0""",
+            (game_id, user_id),
+        )
+        if cur.rowcount == 0:
+            conn.rollback()
+            return False
+
+        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if game is None or game["state"] == "finished":
+            conn.rollback()
+            return False
+
+        pool = float(game["pool"])
+        house_cut = round(pool * config.HOUSE_COMMISSION_PERCENT / 100, 2)
+        prize_pool = round(pool - house_cut, 2)
+        per_winner = round(prize_pool, 2)  # single claimant in this path
+
+        cur.execute(
+            "INSERT INTO house_wallet (balance, total_earned, updated_at) VALUES (%s, %s, %s) "
+            "ON CONFLICT (id) DO UPDATE SET balance = house_wallet.balance + %s, "
+            "total_earned = house_wallet.total_earned + %s, updated_at = %s",
+            (house_cut, house_cut, datetime.utcnow().isoformat(),
+             house_cut, house_cut, datetime.utcnow().isoformat()),
+        )
+        cur.execute(
+            "UPDATE users SET balance = balance + %s WHERE user_id = %s",
+            (per_winner, user_id),
+        )
+        cur.execute(
+            "INSERT INTO transactions (user_id, type, amount, status, created_at) "
+            "VALUES (%s, 'bingo_win', %s, 'completed', %s)",
+            (user_id, per_winner, datetime.utcnow().isoformat()),
+        )
+        cur.execute(
+            "UPDATE games SET state = 'finished', winner_ids = %s, winner_cards = %s, "
+            "house_cut = %s, per_winner_amount = %s, finished_at = %s WHERE id = %s",
+            (
+                json.dumps([user_id]),
+                json.dumps({str(user_id): [int(i) for i in marked_by_card.get(user_id, [])]}),
+                house_cut,
+                per_winner,
+                datetime.utcnow().isoformat(),
+                game_id,
+            ),
+        )
+
+        conn.commit()
+
+        winners_found[user_id] = {}
+        for i in marked_by_card.get(user_id, []):
+            win_type = bingo.get_win_type(bingo.get_card(int(i)), set(marked_by_card.get(user_id, [])))
+            if win_type != "none":
+                winners_found[user_id][int(i)] = win_type
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        release_connection(conn)
+
+
 def get_jackpot() -> dict:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=extras.RealDictCursor)
