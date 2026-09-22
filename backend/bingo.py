@@ -67,7 +67,16 @@ def generate_card_pool(size: int = 200, seed: int = None) -> list:
     return pool
 
 
-CARD_POOL = generate_card_pool(200)
+# Fixed on purpose — this is what makes "card #42" mean the exact same
+# 25 numbers in every process (the API server and the bot run as separate
+# processes in production) and across every restart/redeploy. A random
+# seed here would let the API and the bot silently disagree about what
+# each card contains, which breaks manual BINGO claims: the claim looks
+# valid against whatever card the player is staring at, but the bot's own
+# copy of "card #42" — used to resolve the claim — could be a completely
+# different set of numbers.
+CARD_POOL_SEED = 20260101
+CARD_POOL = generate_card_pool(200, seed=CARD_POOL_SEED)
 
 
 def get_card(card_index: int) -> list:
